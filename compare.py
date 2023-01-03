@@ -13,9 +13,8 @@ def parse_files(input):
         files += file.split(' ')[:2]
     return files
 
-def lev_distance(input, out):
-    files = parse_files(input)
-    ans = []
+
+def find_texts(files):
     texts = []
     for i in range(0, len(files) - 1, 2):
         file_1 = files[i]
@@ -26,10 +25,21 @@ def lev_distance(input, out):
                 b = normalize_text(plagiat.read())
                 texts.append(a)
                 texts.append(b)
-                ans.append(1 - lev(a, b) / max(len(a), len(b)))
+
+    return texts
+
+
+def lev_distance(input):
+    files = parse_files(input)
+    ans = []
+    texts = find_texts(files)
+    for i in range(0, len(texts), 2):
+        ans.append(1 - lev(texts[i], texts[i+1]) / max(len(texts[i]), len(texts[i+1])))
     return ans, texts
 
-def fit_model(test_texts):
+def fit_model(input):
+    files = parse_files(input)
+    test_texts = find_texts(files)
     texts = []
     dir = 'train'
     # Проверим, есть ли вообще нужна директория
@@ -70,21 +80,29 @@ if __name__ == '__main__':
     parser.add_argument('files_to_check', type=str, help='Входной файл с названиями скриптов')
     parser.add_argument('outfile', type=str, help='Файл для записи результатов')
     parser.add_argument('--model', type=int, default=0, help='Нужно ли использовать модель BERT(по умолчанию - нет), введите 1, если требуется модель')
+    parser.add_argument('--mean', type=int, default=0, help='Нужно ли использовать модель BERT(по умолчанию - нет), введите 1, если требуется модель')
     args = parser.parse_args()
-    lev_dists, test_texts = lev_distance(args.files_to_check, args.outfile)
 
     if args.model == 1:
-        cos_dists = fit_model(test_texts)
+        cos_dists = fit_model(args.files_to_check)
         if cos_dists == -1:
             with open(args.outfile, 'w') as f:
                 f.write('Bad request!')
+
+        if args.mean == 0:
+            with open(args.outfile, 'w') as f:
+                for cos in cos_dists:
+                    f.write(f'{cos}\n')
+
         else:
+            lev_dists, test_texts = lev_distance(args.files_to_check)
             # Усредняем полученные результаты косинусного расстояния и расстояния Левенштейна.
             with open(args.outfile, 'w') as f:
                 for lev, cos in zip(lev_dists, cos_dists):
                     f.write(f'{(lev + cos) / 2}\n')
 
     else:
+        lev_dists, test_texts = lev_distance(args.files_to_check)
         with open(args.outfile, 'w') as f:
             for lev in lev_dists:
                 f.write(f'{lev}\n')
